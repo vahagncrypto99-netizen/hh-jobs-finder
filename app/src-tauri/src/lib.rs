@@ -123,8 +123,9 @@ fn stage_from_log(text: &str) -> &'static str {
 /// Turn one raw log line into a human-readable activity line.
 /// `None` = noise the user does not need to see.
 fn humanize_log_line(line: &str) -> Option<String> {
-    let line = line.trim_end();
-    let trimmed = line.trim();
+    // Insight banners come wrapped in backticks (`★ Insight ───…`), so strip
+    // those before deciding what is noise — otherwise the check never fires.
+    let trimmed = line.trim().trim_matches('`').trim();
     if trimmed.is_empty() || trimmed.starts_with('★') || trimmed.starts_with('─') {
         return None;
     }
@@ -233,16 +234,42 @@ pub struct Progress {
     total: i64,
 }
 
+/// The log of the run happening now.
+///
+/// Picking by "is it external" breaks the moment the app restarts mid-run: it
+/// no longer owns the process, calls it external and reads the scheduler's log
+/// — which still holds *last night's* run. So take whichever log was written
+/// most recently, and keep only the part after the last `[init]` marker, so a
+/// previous run's tail can never be shown as current.
+fn read_run_log() -> String {
+    let newest = [manual_log_path(), launchd_log_path()]
+        .into_iter()
+        .filter_map(|p| {
+            let modified = std::fs::metadata(&p).and_then(|m| m.modified()).ok()?;
+            Some((modified, p))
+        })
+        .max_by_key(|(modified, _)| *modified)
+        .map(|(_, p)| p);
+
+    let Some(path) = newest else { return String::new() };
+    text_after_last_init(&std::fs::read_to_string(path).unwrap_or_default())
+}
+
+/// Keep only the current run: everything from the last `[init]` marker on.
+fn text_after_last_init(text: &str) -> String {
+    match text.rfind("\n[init]") {
+        Some(i) => text[i + 1..].to_string(),
+        None if text.starts_with("[init]") => text.to_string(),
+        // No marker at all: the file is from before this run — show nothing
+        // rather than yesterday's summary.
+        None => String::new(),
+    }
+}
+
 fn progress(state: &RunState, pipe: &PipelineStatus) -> Progress {
     let now = registry_counts();
     let baseline = *state.baseline.lock().unwrap();
-
-    let log = std::fs::read_to_string(if pipe.external {
-        launchd_log_path()
-    } else {
-        manual_log_path()
-    })
-    .unwrap_or_default();
+    let log = read_run_log();
 
     let mut stage = stage_from_log(&log).to_string();
     if stage.is_empty() {
@@ -1185,6 +1212,8 @@ defaults:
   → mcp__playwright__browser_evaluate
   → mcp__playwright__browser_evaluate
   → mcp__playwright__browser_navigate [url: https://hh.ru/vacancy/135826974]
+`★ Insight ─────────────────────────────────────`
+`─────────────────────────────────────────────────`
 Собрано 2 новых.
 "#;
         let feed = activity_feed(log, 20);
@@ -1204,11 +1233,21 @@ defaults:
         assert!(!feed.iter().any(|l| l.contains("grep") || l.contains("ToolSearch")));
     }
 
+    #[test]
+    fn run_log_starts_at_the_last_init() {
+        let text = "[init] старый прогон\nстарый хвост\n[init] новый прогон\n  → Agent [subagent_type: hh-collector]\n";
+        // хвост предыдущего прогона отрезан
+        assert!(!text_after_last_init(text).contains("старый"));
+        assert!(text_after_last_init(text).starts_with("[init] новый"));
+        // без маркера показывать нечего — иначе всплывёт вчерашний отчёт
+        assert_eq!(text_after_last_init("итоги вчерашнего запуска\n"), "");
+    }
+
     /// Прогоняет ленту по настоящему логу последнего запуска: она должна быть
     /// читаемой и без абсолютных путей. Пропускается, если лога ещё нет.
     #[test]
     fn real_log_feed_is_readable() {
-        let log = std::fs::read_to_string(manual_log_path()).unwrap_or_default();
+        let log = read_run_log(); // тот же путь выбора, что и в приложении
         if log.trim().is_empty() {
             return;
         }

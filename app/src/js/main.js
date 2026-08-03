@@ -232,6 +232,34 @@ $("stop-run").addEventListener("click", async () => {
 
 $("open-log").addEventListener("click", () => invoke("open_log").catch(fail));
 
+/// Progress bar. While the collector is still working the total is unknown —
+/// a determinate bar would jump backwards with every vacancy found, so it runs
+/// indeterminate until collection ends and only then measures analyzed/found.
+function renderProgressBar(p, running) {
+  const bar = document.querySelector(".bar");
+  const fill = $("bar-fill");
+  const label = $("bar-label");
+  const collecting = p.stage.startsWith("Searching") || p.stage === "Starting up";
+
+  if (running && (collecting || p.found === 0)) {
+    bar.classList.add("indeterminate");
+    fill.style.width = "";
+    label.textContent = p.found ? `collecting — ${p.found} found so far` : "collecting…";
+    return;
+  }
+
+  bar.classList.remove("indeterminate");
+  const total = p.found;
+  const done = Math.min(p.analyzed, total);
+  const pct = total ? Math.round((done / total) * 100) : running ? 0 : 100;
+  fill.style.width = `${pct}%`;
+  label.textContent = total
+    ? `${done} of ${total} processed · ${pct}%`
+    : running
+      ? "waiting for the first vacancy"
+      : "no vacancies in this run";
+}
+
 /// The activity feed is rebuilt only when it actually changed, so the panel
 /// does not flicker and keeps the user's scroll position between polls.
 let lastActivity = "";
@@ -347,6 +375,7 @@ async function refresh(first = false) {
   }
   $("st-failed-wrap").classList.toggle("hidden", p.failed === 0);
 
+  renderProgressBar(p, running);
   renderActivity(p.activity);
 
   // A run just ended: say so in the app too. The system notification may be

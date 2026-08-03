@@ -922,3 +922,35 @@ label.card-row {
   0%, 100% { opacity: 1; transform: scale(1); }
   50%      { opacity: 0.35; transform: scale(0.72); }
 }
+
+/* Прогресс-бар: сколько собранных вакансий уже обработано. */
+.bar {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--fill-press);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  width: 0;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 0.4s ease;
+}
+/* Пока идёт сбор, общий объём работы ещё неизвестен — бегущая полоса
+   честнее, чем шкала, которая скачет от каждой найденной вакансии. */
+.bar.indeterminate .bar-fill {
+  width: 34%;
+  animation: slide 1.4s ease-in-out infinite;
+}
+@keyframes slide {
+  0%   { transform: translateX(-100%); }
+  100% { transform: translateX(330%); }
+}
+.bar-label {
+  font-size: 10.5px;
+  color: var(--muted);
+  margin-top: 5px;
+}
