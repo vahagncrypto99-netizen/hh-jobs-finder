@@ -10,9 +10,24 @@ Write every free-text `detail` in Russian — the user reads it.
 Selectors only via `data-qa` and visible text (via browser_snapshot + click by ref).
 Playwright tools if needed: ToolSearch `select:mcp__playwright__browser_navigate,mcp__playwright__browser_snapshot,mcp__playwright__browser_click,mcp__playwright__browser_type,mcp__playwright__browser_evaluate,mcp__playwright__browser_wait_for,mcp__playwright__browser_take_screenshot,mcp__playwright__browser_fill_form,mcp__playwright__browser_press_key`.
 
+## Detecting "already applied" — check BOTH markers
+
+hh.ru shows the «Вы откликнулись» banner only right after submitting. Open the same vacancy
+later and the banner is gone; what remains is the link to the response:
+`[data-qa="vacancy-response-link-view-topic"]`. Checking the banner alone reports an applied
+vacancy as fresh — verified on a live page.
+
+```js
+() => document.body.innerText.includes('Вы откликнулись')
+      || !!document.querySelector('[data-qa="vacancy-response-link-view-topic"]')
+```
+
+Never use the word «Чат» as a signal: the chat activator sits in the header of every hh.ru
+page (`[data-qa="chatik-activator-navi-item"]`), so it matches everywhere.
+
 ## Step 0: preparation
 1. Navigate to the vacancy url. Redirected to login → `failed`, detail: login_required.
-2. Evaluate: `() => document.body.innerText.includes('Вы откликнулись')` → true → status `already_applied`, stop.
+2. Run the "already applied" check above → true → status `already_applied`, stop.
 3. Snapshot the page. Find the «Откликнуться» button (`[data-qa="vacancy-response-link-top"]` or by text in the snapshot).
 
 ## DRY-RUN: general rule (check BEFORE Step 1)
@@ -36,8 +51,9 @@ Signal: textarea `[data-qa="vacancy-response-popup-form-letter-input"]` (placeho
 3. Click the «Откликнуться» button in the modal (`[data-qa="vacancy-response-submit-popup"]`).
 
 ### Scenario B: response sent instantly (no modal)
-Signal: the page shows «Вы откликнулись» / the button changed to «Чат».
-1. Click «Чат».
+Signal: the "already applied" check above turns true right after the click.
+1. Click `[data-qa="vacancy-response-link-view-topic"]` — the link to this vacancy's response.
+   Do NOT click the header «Чат»: that is the global chat activator, present on every page.
 2. In the chat, click «Добавить сопроводительное» (link under the "Отклик на вакансию" message).
 3. Type the letter into the message field, send it (send button / Enter).
 
@@ -50,7 +66,7 @@ Signal: after the click, a page/form with questions opened (textarea/radio with 
 3. Submit the form → then the letter goes through the chat (Scenario B, steps 1-3).
 
 ## Step 2: verification (except in dry-run)
-Navigate to the vacancy url again. Evaluate `document.body.innerText.includes('Вы откликнулись')`:
+Navigate to the vacancy url again and run the same two-marker check as in Step 0:
 - true → `applied`
 - false → `failed`, screenshot, detail: what's visible on the page.
 

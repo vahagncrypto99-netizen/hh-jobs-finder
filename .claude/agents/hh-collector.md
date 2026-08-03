@@ -1,6 +1,6 @@
 ---
 name: hh-collector
-description: Collects new hh.ru vacancies from search results into YAML. Browser-based (Playwright MCP) - run strictly one at a time, never in parallel with other browser agents.
+description: "FALLBACK ONLY. Collects new hh.ru vacancies from search results into YAML. The pipeline collects with ./scripts/collect.sh (deterministic, no LLM); dispatch this agent only when that script fails because hh.ru changed its data-qa attributes and the parsing skill has not caught up yet. Browser-based (Playwright MCP) - run strictly one at a time, never in parallel with other browser agents."
 tools: ToolSearch, Skill, Read, mcp__playwright__browser_navigate, mcp__playwright__browser_evaluate, mcp__playwright__browser_wait_for, mcp__playwright__browser_snapshot, mcp__playwright__browser_take_screenshot, mcp__playwright__browser_click
 ---
 

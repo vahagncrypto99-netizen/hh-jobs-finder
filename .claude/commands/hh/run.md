@@ -19,18 +19,27 @@ Build the backlog from the registry: entries with status `pending` (not yet anal
 
 `search.filters.text` is a list of search queries. For EACH query in `search.filters.text` (in declared order) build a search_url from `base_url` + that query as `text` + the remaining filters (URL-encode values; spaces in `text` become `+`; booleans stay lowercase `true`/`false`). You'll end up with one search_url per query, to be worked through in order in Stage 1.
 
-## Stage 1: collection (browser, sequential)
-Loop over the search_urls built in Stage 0, one query at a time (in declared order). For each query:
-- Compute the remaining count (config's `count` minus new vacancies already collected so far this run).
-- If remaining count is 0 or there are no more queries, stop the loop.
-- One Agent (subagent_type: hh-collector, run_in_background: false), in the prompt: this query's search_url, the CURRENT known_ids (seeded from Stage 0's registry ids, then topped up with every id collected by earlier queries in this same loop — so a later query never re-collects a vacancy an earlier query already picked up), and the remaining count.
-- Response `error: login_required` → STOP the whole run (all remaining queries included). Report: «Куки протухли — запусти /hh:login».
-- Response `error: captcha` → STOP the whole run: «Капча — нужно ручное вмешательство».
-- Otherwise: parse the YAML, add the entries to data/vacancies-registry.yaml (status: pending), and add their ids to known_ids before moving to the next query.
+## Stage 1: collection (deterministic script, no LLM)
+Run ONE Bash command — the script walks every query itself, deduplicates against the registry
+and appends the new vacancies with `status: pending`:
 
-After the loop: 0 new collected across ALL queries → report and exit ONLY IF the backlog from Stage 0 is also empty; if there's backlog, don't exit — continue to Stage 2 (pending backlog), Stage 3 (matched backlog without letter), Stage 4 (matched backlog with letter) as applicable.
-- If `data/vacancies-registry.yaml` contains an empty flow-list `[]`, replace it with a regular YAML list of entries (don't append after the `[]`).
-- Separate top-level vacancy entries with one blank line; write `description` as a single-line string.
+```bash
+./scripts/collect.sh --count=<count> --json
+```
+
+There is no hh-collector agent to dispatch: opening search pages and reading `data-qa`
+attributes is mechanical work that a script does faster, cheaper and identically every time.
+You do NOT touch the registry in this stage — the script writes it.
+
+Read the JSON it prints (`collected`, `ids`, `warnings`) and act on the exit code:
+- **2** → cookies expired. STOP the whole run: «Куки протухли — запусти /hh:login».
+- **1** → report the stderr line and STOP.
+- **0** → continue. Log any `warnings` in the final report: they mean a `data-qa` selector
+  stopped matching and the parsing skill needs updating.
+
+After the script: 0 new collected → report and exit ONLY IF the backlog from Stage 0 is also
+empty; if there's backlog, continue to Stage 2 (pending backlog), Stage 3 (matched backlog
+without letter), Stage 4 (matched backlog with letter) as applicable.
 
 ## Stage 2: analysis (parallel, workers-many)
 Split the pending vacancies into workers roughly-equal batches — this includes both vacancies just collected in Stage 1 AND any pending backlog from Stage 0 (earlier runs). Launch hh-analyzer agents IN PARALLEL (all Agent calls in one message, run_in_background: false), each given its batch of YAML blocks IN FULL (including description).
@@ -45,10 +54,31 @@ Same thing for matched vacancies with an EMPTY letter field (don't regenerate ex
 Candidates: matched vacancies with a non-empty `letter` and NO `validation_warning` — including matched backlog from earlier runs whose letter was already written and just never applied. A vacancy
 carrying `validation_warning` (letter never converged) or an empty letter is NOT applied to —
 leave it as matched and show the reason in the report, so the user can fix the letter and rerun.
-For each candidate IN TURN: Agent (subagent_type: hh-applier, run_in_background: false), in the prompt id, url, letter, dry_run, resume_title (from config.yaml).
-After EACH response, update the registry RIGHT AWAY: status applied (+applied_at ISO timestamp) / failed (+error) / already_applied → applied with a note; dry_run_ok → leave as matched, in the report's detail.
-If login_required or captcha shows up in the response's detail/status — STOP the whole stage (leave the remaining matched vacancies untouched); state the reason in the report: login_required → «запусти /hh:login», captcha → «капча, ручное вмешательство».
-Pause between responses: `sleep N` (Bash), N — a random value from the config's pause_between_applies_sec.
+Run ONE Bash command — the script walks the queue itself, keeps the configured pause between
+responses and updates the registry after each one:
+
+```bash
+./scripts/apply.sh --live --json          # боевой режим
+./scripts/apply.sh --json                 # dry-run: ничего не отправляется
+```
+
+**Omit `--live` whenever the run is a dry-run.** Without that flag the script never clicks
+«Откликнуться» — that is the safety switch against an accidental mass mailing.
+
+The script handles the two mechanical scenarios (modal with a letter field, and letter sent
+into the response chat). It deliberately does NOT handle the employer test: answering those
+questions needs the resume and judgement. Everything it is not sure about comes back as
+`needs_llm` instead of a random click.
+
+Read the JSON (`applied`, `needs_llm`, `failed`):
+- For **every entry in `needs_llm`** dispatch ONE `hh-applier` agent (run_in_background: false,
+  strictly one at a time) with id, url, letter, dry_run and resume_title from config.yaml, and
+  update that vacancy's registry status from the agent's answer. This is the only place the
+  browser agent is still used.
+- `failed` entries stay in the report with their detail; the script has already written their
+  status.
+- If a detail mentions login_required or captcha — STOP the stage and say so in the report:
+  login_required → «запусти /hh:login», captcha → «капча, ручное вмешательство».
 
 ## Stage 5: report
 Write `data/run-reports/<YYYY-MM-DDTHH-MM-SS>.md`:

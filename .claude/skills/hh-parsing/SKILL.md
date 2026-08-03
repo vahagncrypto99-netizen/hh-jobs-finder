@@ -65,7 +65,9 @@ Navigate to `url`, wait for `[data-qa="vacancy-title"]` (browser_wait_for on the
   company: document.querySelector('[data-qa="vacancy-company-name"]')?.textContent.trim() || null,
   description: document.querySelector('[data-qa="vacancy-description"]')?.innerText.trim().replace(/\s+/g, ' ') || null,
   skills: Array.from(document.querySelectorAll('[data-qa="skills-element"]')).map(e => e.textContent.trim()),
+  // Баннер живёт только сразу после отправки; позже остаётся ссылка на отклик
   already_responded: document.body.innerText.includes('Вы откликнулись')
+    || !!document.querySelector('[data-qa="vacancy-response-link-view-topic"]')
 })
 ```
 
