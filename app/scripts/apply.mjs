@@ -70,8 +70,11 @@ const RESPOND_BUTTON = '[data-qa="vacancy-response-link-top"]';
 const LETTER_INPUT = '[data-qa="vacancy-response-popup-form-letter-input"]';
 const SUBMIT_POPUP = '[data-qa="vacancy-response-submit-popup"]';
 const RELOCATION_OK = '[data-qa="relocation-warning-confirm"]';
-/** Ссылка «перейти к отклику» — она же вход в чат по этой вакансии. */
+/** Ссылка «перейти к отклику» — появляется вместо кнопки после отправки. */
 const VIEW_TOPIC = '[data-qa="vacancy-response-link-view-topic"]';
+/** Кнопка «прикрепить сопроводительное» и отправка этого письма. */
+const ATTACH_LETTER = '[data-qa="responded-success-attach-cover-letter"]';
+const LETTER_SUBMIT = '[data-qa="vacancy-response-letter-submit"]';
 
 /**
  * Отклик уже отправлен?
@@ -100,21 +103,22 @@ async function applyViaModal(page, letter, resumeTitle) {
   await page.waitForTimeout(2500);
 }
 
-/** Сценарий B: отклик ушёл сразу, письмо добавляется сообщением в чат. */
-async function applyViaChat(page, letter) {
-  const chat = page.locator(VIEW_TOPIC).first();
-  if ((await chat.count()) === 0) throw new Error("не найдена ссылка на отклик/чат");
-  await chat.click();
-  await page.waitForLoadState("domcontentloaded");
-
-  const addLetter = page.locator('text="Добавить сопроводительное"').first();
-  if ((await addLetter.count()) === 0) throw new Error("нет ссылки «Добавить сопроводительное»");
-  await addLetter.click();
-
-  const field = page.locator("textarea").first();
-  await field.waitFor({ timeout: 10_000 });
-  await field.fill(letter);
-  await field.press("Enter");
+/**
+ * Сценарий B: отклик ушёл мгновенно, письмо прикрепляется отдельно.
+ *
+ * Не через чат: после отправки на самой странице вакансии появляется кнопка
+ * «прикрепить сопроводительное», по ней открывается та же textarea, что и в
+ * модалке, со своей кнопкой отправки. Проверено на живой странице.
+ */
+async function attachLetter(page, letter) {
+  const attach = page.locator(ATTACH_LETTER).first();
+  if ((await attach.count()) === 0) {
+    throw new Error("нет кнопки «прикрепить сопроводительное»");
+  }
+  await attach.click();
+  await page.waitForSelector(LETTER_INPUT, { timeout: 10_000 });
+  await page.fill(LETTER_INPUT, letter);
+  await page.click(LETTER_SUBMIT);
   await page.waitForTimeout(2500);
 }
 
@@ -123,7 +127,22 @@ async function applyToVacancy(page, vacancy, cfg) {
   await page.goto(vacancy.url, { waitUntil: "domcontentloaded", timeout: 30_000 });
 
   if (page.url().includes("account/login")) return { status: "failed", detail: "нужен вход на hh.ru" };
-  if (await alreadyApplied(page)) return { status: "applied", detail: "отклик уже был на странице" };
+
+  if (await alreadyApplied(page)) {
+    // Отклик мог уйти без письма — например, прошлый заход оборвался между
+    // отправкой и прикреплением. Кнопка «прикрепить сопроводительное» жива
+    // ограниченное время, так что дописываем письмо, пока она есть.
+    const canAttach = LIVE && vacancy.letter && (await page.locator(ATTACH_LETTER).count()) > 0;
+    if (canAttach) {
+      try {
+        await attachLetter(page, vacancy.letter);
+        return { status: "applied", detail: "отклик был отправлен ранее, письмо дописано" };
+      } catch (e) {
+        return { status: "applied", detail: `отклик есть, письмо прикрепить не вышло: ${String(e.message || e).split("\n")[0]}` };
+      }
+    }
+    return { status: "applied", detail: "отклик уже был на странице" };
+  }
 
   const respond = page.locator(RESPOND_BUTTON).first();
   if ((await respond.count()) === 0) {
@@ -148,7 +167,7 @@ async function applyToVacancy(page, vacancy, cfg) {
     if ((await page.locator(LETTER_INPUT).count()) > 0) {
       await applyViaModal(page, vacancy.letter, cfg.resume_title);
     } else if (await alreadyApplied(page)) {
-      await applyViaChat(page, vacancy.letter);
+      await attachLetter(page, vacancy.letter);
     } else {
       // Форма с вопросами работодателя: отвечать на них по резюме — работа
       // для модели, а не для скрипта.

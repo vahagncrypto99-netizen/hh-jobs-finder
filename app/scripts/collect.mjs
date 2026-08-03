@@ -138,7 +138,13 @@ async function main() {
   const cfg = loadConfig();
   const limit = Number(flag("count")) || cfg.defaults?.count || 20;
   const maxPages = cfg.parsing?.max_pages ?? 10;
-  const queries = cfg.search?.filters?.text ?? [];
+  // Разовые переопределения (config.yaml не трогают): удобно, когда нужно
+  // добрать вакансий по конкретному запросу или заглянуть глубже по времени.
+  const queryOverride = flag("query");
+  const periodOverride = flag("period");
+  if (periodOverride) cfg.search.filters.search_period = Number(periodOverride);
+
+  const queries = queryOverride ? [queryOverride] : (cfg.search?.filters?.text ?? []);
   if (!queries.length) throw new Error("в config.yaml нет поисковых запросов");
 
   const known = knownIds();

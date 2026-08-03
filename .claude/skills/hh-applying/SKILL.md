@@ -52,10 +52,21 @@ Signal: textarea `[data-qa="vacancy-response-popup-form-letter-input"]` (placeho
 
 ### Scenario B: response sent instantly (no modal)
 Signal: the "already applied" check above turns true right after the click.
-1. Click `[data-qa="vacancy-response-link-view-topic"]` — the link to this vacancy's response.
-   Do NOT click the header «Чат»: that is the global chat activator, present on every page.
-2. In the chat, click «Добавить сопроводительное» (link under the "Отклик на вакансию" message).
-3. Type the letter into the message field, send it (send button / Enter).
+
+The letter is NOT attached through the chat. Right on the vacancy page a success block
+appears with a button to attach the cover letter (verified on a live page):
+
+1. Click `[data-qa="responded-success-attach-cover-letter"]`.
+2. A textarea appears — the same `[data-qa="vacancy-response-popup-form-letter-input"]` as in
+   the modal. Type the letter into it.
+3. Submit with `[data-qa="vacancy-response-letter-submit"]` (this is a different button from
+   the modal's `vacancy-response-submit-popup`).
+
+The attach button disappears once the letter is accepted — that is the confirmation. It also
+lives only for a while after the response, so attach the letter in the same session.
+
+Do NOT click the header «Чат» and do not hunt for the text «Добавить сопроводительное»: the
+chat activator sits on every page, and that wording is not what the button says.
 
 ### Scenario C: employer test
 Signal: after the click, a page/form with questions opened (textarea/radio with employer questions).
