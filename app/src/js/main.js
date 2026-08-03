@@ -25,6 +25,7 @@ let configSaveTimer = null;
 let scheduleSaveTimer = null;
 let lastMtime = 0; // config.yaml mtime as currently rendered in the form
 let lastSetupMessage = null; // so an import result is announced once, not every poll
+let wasRunning = false; // to catch the moment a run ends, whatever started it
 
 // ---------- status line (footer) ----------
 let statusTimer = null;
@@ -347,6 +348,19 @@ async function refresh(first = false) {
   $("st-failed-wrap").classList.toggle("hidden", p.failed === 0);
 
   renderActivity(p.activity);
+
+  // A run just ended: say so in the app too. The system notification may be
+  // suppressed (macOS blocks them for some unsigned builds), the footer never is.
+  if (wasRunning && !running) {
+    const failed = s.pipeline.last_exit != null && s.pipeline.last_exit !== 0;
+    say(
+      failed
+        ? `Run failed (exit ${s.pipeline.last_exit}) — open the log`
+        : `Run finished — found ${p.found}, applied ${p.applied}, skipped ${p.skipped}`,
+      failed,
+    );
+  }
+  wasRunning = running;
 
   // config.yaml is the single source of truth: pull in outside edits, but never
   // while a save is queued or the user has a control focused.

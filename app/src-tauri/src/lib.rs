@@ -623,6 +623,66 @@ pub struct RunState {
     /// The `/hh:init` onboarding run started from "Set resume".
     init_child: Mutex<Option<Child>>,
     init_result: Mutex<Option<String>>,
+    /// Was a scheduled run visible on the previous poll — the edge that tells
+    /// us a launchd run started or finished while the app was open.
+    prev_external: Mutex<bool>,
+    /// A finished run waiting to be announced, consumed by the notifier.
+    finish_pending: Mutex<Option<FinishEvent>>,
+}
+
+#[derive(Clone, Copy)]
+pub struct FinishEvent {
+    scheduled: bool,
+    exit: Option<i32>,
+}
+
+/// Watch the run edges: a start snapshots the registry (so progress and the
+/// notification report this run, not lifetime totals), a finish queues the
+/// notification. Called once per poll — the only place with side effects.
+fn track_run_edges(state: &RunState, pipe: &PipelineStatus) {
+    let mut prev_external = state.prev_external.lock().unwrap();
+    if pipe.external && !*prev_external {
+        *state.baseline.lock().unwrap() = Some(registry_counts());
+    } else if !pipe.external && *prev_external {
+        // Never overwrite a manual finish queued in the same poll: the tail of
+        // a manual run can register as "external" for a single tick and would
+        // otherwise produce a second, wrong notification.
+        let mut pending = state.finish_pending.lock().unwrap();
+        if pending.is_none() {
+            *pending = Some(FinishEvent {
+                scheduled: true,
+                exit: None,
+            });
+        }
+    }
+    *prev_external = pipe.external;
+}
+
+/// Show a system notification for a run that just ended.
+fn announce_finish(app: &tauri::AppHandle, event: FinishEvent, p: &Progress) {
+    use tauri_plugin_notification::NotificationExt;
+
+    let what = if event.scheduled { "Scheduled run" } else { "Run" };
+    let (title, body) = match event.exit {
+        Some(code) if code != 0 => (
+            format!("{what} failed"),
+            format!("Exit code {code} — open the log for details"),
+        ),
+        _ => (
+            format!("{what} finished"),
+            format!(
+                "Found {}, applied {}, skipped {}",
+                p.found, p.applied, p.skipped
+            ),
+        ),
+    };
+
+    let _ = app
+        .notification()
+        .builder()
+        .title(title)
+        .body(body)
+        .show();
 }
 
 // ---------- onboarding from a CV ----------
@@ -773,6 +833,10 @@ fn pipeline_status(state: &RunState) -> PipelineStatus {
         match child.try_wait() {
             Ok(Some(status)) => {
                 *state.last_exit.lock().unwrap() = status.code();
+                *state.finish_pending.lock().unwrap() = Some(FinishEvent {
+                    scheduled: false,
+                    exit: status.code(),
+                });
                 *child_guard = None;
             }
             Ok(None) => running = true,
@@ -813,7 +877,7 @@ pub struct AppState {
 }
 
 #[tauri::command]
-fn get_state(state: State<RunState>) -> AppState {
+fn get_state(app: tauri::AppHandle, state: State<RunState>) -> AppState {
     let (config, config_error) = match read_config_view() {
         Ok(c) => (Some(c), None),
         Err(e) => (None, Some(e)),
@@ -829,7 +893,11 @@ fn get_state(state: State<RunState>) -> AppState {
         .map(|d| d.as_secs())
         .unwrap_or(0);
     let pipeline = pipeline_status(&state);
+    track_run_edges(&state, &pipeline);
     let progress = progress(&state, &pipeline);
+    if let Some(event) = state.finish_pending.lock().unwrap().take() {
+        announce_finish(&app, event, &progress);
+    }
     AppState {
         config,
         config_error,
@@ -1199,6 +1267,7 @@ pub fn run() {
 
     builder
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_notification::init())
         .manage(RunState::default())
         .setup(|app| {
             // Pure menu-bar app: no Dock icon.
