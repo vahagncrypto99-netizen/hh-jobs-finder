@@ -1,0 +1,25 @@
+# --- Приватное: персональные данные, в git не попадает ---
+# Комментарии только на отдельной строке: в хвосте паттерна `#` не начинает
+# комментарий и становится частью самого паттерна.
+
+# контакты, подпись, фильтры (есть config.yaml.example)
+config.yaml
+# резюме (есть resume.md.example)
+resume.md
+# шаблон письма с твоими фактами (есть templates/letter.md.example)
+templates/letter.md
+# генерируется scheduler/install.sh из .example (абсолютные пути машины)
+scheduler/com.hh-jobs.plist
+
+# --- Данные прогонов: вакансии, письма, отчёты, логи ---
+/data/*
+!/data/run-reports/
+/data/run-reports/*
+!/data/run-reports/.gitkeep
+
+# --- Сборка и кеши ---
+.playwright-mcp/
+app/node_modules/
+app/src-tauri/target/
+app/src-tauri/gen/
+.DS_Store

@@ -1,0 +1,17 @@
+{
+  "name": "hh-jobs-app",
+  "version": "0.1.0",
+  "description": "Mini control app for the hh.ru auto-apply pipeline: scheduler + config.yaml settings",
+  "type": "module",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2"
+  },
+  "dependencies": {
+    "playwright-core": "^1.62.1"
+  }
+}

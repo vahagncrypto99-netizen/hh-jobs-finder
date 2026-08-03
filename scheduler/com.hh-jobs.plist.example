@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Шаблон launchd-задачи. Реальный com.hh-jobs.plist генерируется из него
+  скриптом scheduler/install.sh: __REPO_ROOT__ заменяется на путь репозитория,
+  __HOME__ — на домашний каталог. Сгенерированный файл в git не попадает.
+
+  Время запусков правится в приложении (таб Run → Schedule) либо руками здесь.
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hh-jobs</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__REPO_ROOT__/hhru-jobs</string>
+        <string>--verbose</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>__REPO_ROOT__</string>
+
+    <key>EnvironmentVariables</key>
+    <dict>
+        <key>PATH</key>
+        <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+    </dict>
+
+    <!-- Каждый день в 09:00 и 22:00 -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>9</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>22</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+
+    <key>StandardOutPath</key>
+    <string>__REPO_ROOT__/data/run-reports/launchd.log</string>
+    <key>StandardErrorPath</key>
+    <string>__REPO_ROOT__/data/run-reports/launchd.err.log</string>
+</dict>
+</plist>

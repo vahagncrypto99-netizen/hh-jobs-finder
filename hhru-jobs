@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# hhru-jobs — запуск пайплайна авто-откликов hh.ru
+# Использование: ./hhru-jobs [--w=N] [-c N] [--dry-run] [--verbose] [--print-cmd]
+set -euo pipefail
+cd "$(dirname "$0")"
+
+WORKERS=""
+COUNT=""
+DRY=""
+PRINT=0
+VERBOSE=0
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --w=*|--workers=*|-w=*) WORKERS="${1#*=}" ;;
+    -w|--workers)
+      [[ -n "${2:-}" ]] || { echo "usage: ./hhru-jobs [--w=N|-w N] [-c N|--count=N] [--dry-run] [--print-cmd]" >&2; exit 1; }
+      WORKERS="$2"; shift ;;
+    --c=*|--count=*|-c=*)   COUNT="${1#*=}" ;;
+    -c|--count)
+      [[ -n "${2:-}" ]] || { echo "usage: ./hhru-jobs [--w=N|-w N] [-c N|--count=N] [--dry-run] [--print-cmd]" >&2; exit 1; }
+      COUNT="$2"; shift ;;
+    --dry-run)              DRY="dry-run" ;;
+    --verbose|-v)           VERBOSE=1 ;;
+    --print-cmd)            PRINT=1 ;;
+    -h|--help)
+      echo "usage: ./hhru-jobs [--w=N|-w N] [-c N|--count=N] [--dry-run] [--print-cmd]"
+      exit 0 ;;
+    *) echo "unknown option: $1" >&2; exit 1 ;;
+  esac
+  shift
+done
+
+# Дефолты из config.yaml (только цифры — inline-комментарии отбрасываются)
+WORKERS="${WORKERS:-$(sed -n 's/^ *workers: *\([0-9][0-9]*\).*/\1/p' config.yaml | head -1)}"
+COUNT="${COUNT:-$(sed -n 's/^ *count: *\([0-9][0-9]*\).*/\1/p' config.yaml | head -1)}"
+
+PROMPT="/hh:run workers=${WORKERS} count=${COUNT}${DRY:+ ${DRY}}"
+
+CMD=(claude -p "$PROMPT"
+  --allowedTools "mcp__playwright__*,Read,Write,Edit,Bash,Glob,Grep,Agent,Skill,ToolSearch")
+
+if [[ $VERBOSE -eq 1 ]]; then
+  # Живой лог каждого шага (текст модели, вызовы инструментов, субагенты)
+  CMD+=(--output-format stream-json --verbose)
+else
+  CMD+=(--output-format text)
+fi
+
+if [[ $PRINT -eq 1 ]]; then
+  printf '%s ' "${CMD[@]}"; echo
+  exit 0
+fi
+
+if [[ $VERBOSE -eq 1 ]]; then
+  "${CMD[@]}" | python3 scripts/format-stream.py
+else
+  exec "${CMD[@]}"
+fi

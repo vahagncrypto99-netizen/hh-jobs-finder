@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>hh-jobs</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header class="header" data-tauri-drag-region>
+        <div class="header-left" data-tauri-drag-region>
+          <span class="logo">hh</span>
+          <span class="title">hh-jobs</span>
+        </div>
+        <div class="header-actions">
+          <button id="open-config" class="icon-btn" title="Edit config.yaml">✎</button>
+          <button id="quit" class="icon-btn" title="Quit hh-jobs">⏻</button>
+        </div>
+      </header>
+
+      <nav class="tab-bar" id="tabs">
+        <button class="tab active" data-tab="run">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+          <span>Run</span>
+        </button>
+        <button class="tab" data-tab="settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span>Settings</span>
+        </button>
+      </nav>
+
+      <main class="content panel-body">
+        <!-- ───────────────────────────── Run ───────────────────────────── -->
+        <section class="tab-panel" data-tab="run">
+          <div class="settings-group">
+            <span class="group-title">Status</span>
+            <div class="card">
+              <div class="card-row">
+                <span class="card-label">Pipeline</span>
+                <span class="card-control"><span id="pipeline-status" class="dot-badge">…</span></span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">Scheduler</span>
+                <span class="card-control"><span id="agent-status" class="dot-badge">…</span></span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">hh.ru session</span>
+                <span class="card-control">
+                  <span id="auth-status" class="dot-badge">not checked</span>
+                  <button id="check-auth" class="ghost-btn">Check</button>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-title">Manual run</span>
+            <div class="card">
+              <label class="card-row">
+                <span class="card-label">Dry run — never submit applications</span>
+                <input type="checkbox" id="dry-run" />
+              </label>
+              <div class="card-row">
+                <span class="card-label">Pipeline</span>
+                <span class="card-control">
+                  <button id="run-now" class="ghost-btn accent">Run now</button>
+                  <button id="stop-run" class="ghost-btn danger hidden">Stop</button>
+                  <button id="open-log" class="ghost-btn">Log</button>
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group" id="progress-group">
+            <span class="group-title" id="progress-title">Progress</span>
+            <div class="card">
+              <div class="card-row">
+                <span class="card-label" id="stage-label">Idle</span>
+                <span class="card-control">
+                  <button id="toggle-log" class="ghost-btn">Details</button>
+                </span>
+              </div>
+              <div class="card-row stats-row">
+                <span class="stat"><b id="st-found">0</b><i>found</i></span>
+                <span class="stat"><b id="st-analyzed">0</b><i>analyzed</i></span>
+                <span class="stat"><b id="st-skipped">0</b><i>skipped</i></span>
+                <span class="stat"><b id="st-applied">0</b><i>applied</i></span>
+                <span class="stat hidden" id="st-failed-wrap"><b id="st-failed">0</b><i>failed</i></span>
+              </div>
+              <div class="card-row card-row--column hidden" id="log-row">
+                <pre id="log-tail" class="log"></pre>
+              </div>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-title">Schedule</span>
+            <div class="card">
+              <div class="card-row card-row--column">
+                <div id="schedule-list" class="chips"></div>
+                <div class="select-row">
+                  <button id="add-time" class="ghost-btn">＋ Time</button>
+                </div>
+              </div>
+            </div>
+            <p class="hint">Saved automatically — the launchd agent reloads on every change.
+              Scheduled runs read workers and vacancy limit from config.yaml.</p>
+          </div>
+        </section>
+
+        <!-- ─────────────────────────── Settings ─────────────────────────── -->
+        <section class="tab-panel hidden" data-tab="settings">
+          <div class="settings-group">
+            <span class="group-title">Setup</span>
+            <div class="card">
+              <div class="card-row">
+                <span class="card-label">Profile</span>
+                <span class="card-control">
+                  <span id="setup-status" class="dot-badge">…</span>
+                  <button id="set-resume" class="ghost-btn">Set resume…</button>
+                </span>
+              </div>
+            </div>
+            <p class="hint">Pick your CV (pdf, docx, md, txt) and it fills
+              <code>config.yaml</code> and <code>resume.md</code>: name, contacts, stack and
+              the achievements cover letters are built from. Salary, queries and filters stay
+              yours to set below.</p>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-title">Cover letter</span>
+            <div class="card">
+              <div class="card-row">
+                <span class="card-label">Written by</span>
+                <span class="card-control">
+                  <select id="f-letter-mode" class="select">
+                    <option value="ai">AI — skills &amp; subagents</option>
+                    <option value="template">Template — no AI</option>
+                  </select>
+                </span>
+              </div>
+            </div>
+            <p class="hint">Template mode fills <code>templates/letter.md</code>: instant and free,
+              but letters within one topic come out nearly identical. Use AI for vacancies you
+              actually want.</p>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-title">Search queries</span>
+            <div class="card">
+              <div class="card-row card-row--column">
+                <div id="query-list"></div>
+                <div class="select-row">
+                  <button id="add-query" class="ghost-btn">＋ Query</button>
+                </div>
+              </div>
+            </div>
+            <p class="hint">Queries run one after another until the vacancy limit is filled.</p>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-title">Filters</span>
+            <div class="card">
+              <div class="card-row">
+                <span class="card-label">Posted within</span>
+                <span class="card-control">
+                  <select id="f-period" class="select">
+                    <option value="1">Last 24 hours</option>
+                    <option value="3">Last 3 days</option>
+                    <option value="7">Last week</option>
+                    <option value="30">Last month</option>
+                    <option value="0">Any time</option>
+                  </select>
+                </span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">Minimum salary</span>
+                <span class="card-control">
+                  <input type="number" id="f-salary" class="num" min="0" step="100" />
+                  <select id="f-currency" class="select narrow">
+                    <option value="USD">USD</option>
+                    <option value="EUR">EUR</option>
+                    <option value="RUR">RUB</option>
+                    <option value="KZT">KZT</option>
+                    <option value="UAH">UAH</option>
+                    <option value="GEL">GEL</option>
+                    <option value="AZN">AZN</option>
+                    <option value="KGS">KGS</option>
+                    <option value="UZS">UZS</option>
+                    <option value="BYR">BYN</option>
+                  </select>
+                </span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">Experience</span>
+                <span class="card-control">
+                  <select id="f-experience" class="select">
+                    <option value="noExperience">No experience</option>
+                    <option value="between1And3">1–3 years</option>
+                    <option value="between3And6">3–6 years</option>
+                    <option value="moreThan6">6+ years</option>
+                  </select>
+                </span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">Work format</span>
+                <span class="card-control">
+                  <select id="f-work-format" class="select">
+                    <option value="REMOTE">Remote</option>
+                    <option value="HYBRID">Hybrid</option>
+                    <option value="ON_SITE">On-site</option>
+                    <option value="FIELD_WORK">Field work</option>
+                  </select>
+                </span>
+              </div>
+              <label class="card-row">
+                <span class="card-label">Search all regions</span>
+                <input type="checkbox" id="f-no-area" />
+              </label>
+              <label class="card-row">
+                <span class="card-label">Show result snippets</span>
+                <input type="checkbox" id="f-snippets" />
+              </label>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <span class="group-title">Run limits</span>
+            <div class="card">
+              <div class="card-row">
+                <span class="card-label">Parallel workers</span>
+                <span class="card-control"><input type="number" id="f-workers" class="num" min="1" max="10" /></span>
+              </div>
+              <div class="card-row">
+                <span class="card-label">Vacancies per run</span>
+                <span class="card-control"><input type="number" id="f-count" class="num" min="1" max="100" /></span>
+              </div>
+            </div>
+          </div>
+
+          <p class="hint">Every change is written straight to <code>config.yaml</code>,
+            comments and layout intact. Edit the file by hand and this panel follows it.</p>
+        </section>
+      </main>
+
+      <footer class="footer" id="footer">
+        <span id="status" class="muted"></span>
+      </footer>
+    </div>
+
+    <script src="js/main.js" defer></script>
+  </body>
+</html>

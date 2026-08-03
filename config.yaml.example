@@ -1,0 +1,85 @@
+# Конфигурация системы авто-откликов hh.ru.
+#
+# Скопируй в config.yaml и заполни под себя — или запусти `/hh:init` в Claude Code,
+# и он заполнит config.yaml вместе с resume.md по твоему резюме.
+#
+# config.yaml и resume.md в git НЕ попадают (см. .gitignore): там контакты и
+# персональные данные.
+
+# Поиск вакансий: базовый URL + фильтры (query-параметры hh.ru)
+search:
+  base_url: "https://hh.ru/search/vacancy"
+  filters:
+    text:                        # поисковые запросы — обходятся по очереди, пока не набран count
+      - "Laravel"
+      - "Backend разработчик"
+      - "Backend developer"
+
+    salary: 2000                 # минимальная зарплата
+    currency_code: "USD"         # USD | EUR | RUR | KZT | UAH | GEL | AZN | KGS | UZS | BYR
+    experience: "between3And6"   # noExperience | between1And3 | between3And6 | moreThan6
+    work_format: "REMOTE"        # REMOTE | HYBRID | ON_SITE | FIELD_WORK
+    no_default_area: true        # искать по всем регионам
+    enable_snippets: false
+    search_period: 3             # за сколько суток искать: 1 | 3 | 7 | 30 | 0 (за всё время)
+
+# Название резюме на hh.ru, которым откликаемся — должно совпадать с тем, что на сайте
+resume_title: "Backend-разработчик (PHP/Laravel)"
+
+defaults:
+  workers: 1   # параллельных analyzer/letter субагентов
+  count: 20    # максимум новых вакансий за запуск
+
+# Пауза между откликами (секунды, случайная в диапазоне)
+pause_between_applies_sec: [5, 15]
+
+# Контакты — подставляются в письмо байт в байт
+contacts:
+  portfolio: "https://github.com/username"
+  telegram: "@username"
+  phone: "+00-00-00-00-00"
+
+signature: "Имя Фамилия"
+
+# --- Критерии матчинга (читает hh-analyzer через skill hh-matching) ---
+matching:
+  # Хард-скип: заголовок содержит любое из этих слов (RU/EN, любой регистр)
+  title_blacklist: [Team Lead, Teamlead, Tech Lead, Techlead, Lead, Тимлид, Техлид, Руководитель, Head of, CTO]
+  # НЕ считать скипом (уровневые слова, которые нам подходят)
+  title_ok_levels: [Senior, Middle, Middle+]
+  # Хард-скип: вакансия, где primary framework — из этого списка
+  framework_blacklist: [Yii2, Yii3, Symfony, Bitrix, Битрикс, OpenCart, WordPress, Drupal, CodeIgniter]
+  # Хард-скип: primary язык вакансии не из этого списка
+  primary_languages: [PHP]
+  # Наш основной стек (совпадение → match)
+  core_stack: [PHP, Laravel, MySQL, PostgreSQL, Redis, RabbitMQ, Docker]
+  # Фронт, который нам подходит в fullstack-вакансиях
+  frontend_stack: [JavaScript, Vue, Vue.js, Nuxt]
+  # Допустимые вторичные технологии (не наш профиль, но не блокер)
+  acceptable_secondary: [React, Next.js, TypeScript]
+  # «Освоить за неделю-две» — отсутствие в резюме НЕ считается пробелом
+  learnable_tech: [Laravel Nova, Tailwind CSS, Vite, Inertia.js, Livewire, Alpine.js]
+  # Скилы из резюме, которые запрещено учитывать при матчинге
+  ignore_resume_skills: []
+  # Перепроверка того, что уже отфильтровано URL-ом
+  recheck:
+    max_experience_years: 6      # «опыт от 7 лет» в описании → skip
+    reject_if_office_only: true  # «только офис» → skip
+  # Политика при сомнении: match | skip
+  doubt_policy: match
+
+# --- Режим написания сопроводительного (читает hh-letter) ---
+letter:
+  mode: ai                      # ai — пишет ИИ (скиллы + сабагенты); template — сборка по шаблону без ИИ
+  template: "templates/letter.md"  # шаблон для режима template
+
+# --- Валидация писем (читает hh-letter) ---
+letter_validation:
+  length_range: [500, 900]          # знаков, без блока контактов и подписи
+  max_iterations: 5                 # итераций цикла гейтов
+  ru_ai_check_min_score: 7.0        # проходной балл ru-ai-check (0–10): «Хороший» и выше
+  required_tech_mentions: [1, 2]    # сколько пересекающихся технологий называть явно
+
+# --- Парсинг выдачи (читает hh-collector через skill hh-parsing) ---
+parsing:
+  max_pages: 10                     # предохранитель пагинации

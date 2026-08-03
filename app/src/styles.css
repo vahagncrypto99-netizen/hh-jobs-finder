@@ -1,0 +1,895 @@
+:root {
+  /* System-widget palette (matches native macOS menus/widgets). */
+  --bg: #232325;
+  --bg-panel: #232325;
+  --fill: rgba(255, 255, 255, 0.07);
+  --fill-hover: rgba(255, 255, 255, 0.11);
+  --fill-press: rgba(255, 255, 255, 0.16);
+  --line: rgba(255, 255, 255, 0.12);
+  --line-soft: rgba(255, 255, 255, 0.07);
+  --text: rgba(255, 255, 255, 0.96);
+  --text-dim: rgba(235, 235, 245, 0.72);
+  --muted: rgba(235, 235, 245, 0.55);
+  --accent: #0a84ff;
+  --on-accent: #ffffff;
+  --green: #30d158;
+  --popover: #2b2b2d;
+  --radius: 10px;
+  --radius-sm: 7px;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter",
+    "Segoe UI", sans-serif;
+}
+
+/* Light theme — follows the OS appearance automatically. */
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #ececec;
+    --bg-panel: #ececec;
+    --fill: rgba(0, 0, 0, 0.05);
+    --fill-hover: rgba(0, 0, 0, 0.08);
+    --fill-press: rgba(0, 0, 0, 0.12);
+    --line: rgba(0, 0, 0, 0.12);
+    --line-soft: rgba(0, 0, 0, 0.07);
+    --text: rgba(0, 0, 0, 0.88);
+    --text-dim: rgba(60, 60, 67, 0.75);
+    --muted: rgba(60, 60, 67, 0.55);
+    --accent: #007aff;
+    --on-accent: #ffffff;
+    --green: #1faf4e;
+    --popover: #f5f5f5;
+  }
+}
+
+/* macOS: nearly transparent surfaces over the native vibrancy material —
+   the system draws the widget glass, CSS only tints it. */
+body.mac {
+  --bg: rgba(30, 30, 32, 0.16);
+  --bg-panel: rgba(30, 30, 32, 0.55);
+  --popover: rgba(43, 43, 45, 0.7);
+}
+@media (prefers-color-scheme: light) {
+  body.mac {
+    --bg: rgba(246, 246, 246, 0.2);
+    --bg-panel: rgba(246, 246, 246, 0.6);
+    --popover: rgba(250, 250, 250, 0.72);
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* No webview focus rings — this is a native-looking widget. */
+button:focus,
+select:focus,
+input:focus {
+  outline: none;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  overflow: hidden;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--bg);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+/* Header — flat, like a widget title row */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px 8px;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+.logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 600;
+}
+.title {
+  font-size: 13px;
+  color: var(--text);
+}
+.header-actions {
+  display: flex;
+  gap: 2px;
+}
+
+/* Buttons */
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  font-size: 17px;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.icon-btn:hover {
+  background: var(--fill-hover);
+  color: var(--text);
+}
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.toolbar {
+  display: flex;
+  gap: 8px;
+  padding: 0 12px 9px;
+}
+.search {
+  flex: 1;
+  background: var(--fill);
+  border: none;
+  border-radius: 9px;
+  color: var(--text);
+  padding: 8px 11px;
+  font-size: 13px;
+  outline: none;
+  transition: background 0.12s ease;
+}
+.search::placeholder {
+  color: var(--muted);
+}
+.search:focus {
+  background: var(--fill-hover);
+}
+.add-btn {
+  background: var(--fill);
+  color: var(--text);
+  border: none;
+  border-radius: 9px;
+  width: 34px;
+  font-size: 17px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.add-btn:hover {
+  background: var(--fill-hover);
+}
+.add-btn:active {
+  background: var(--fill-press);
+}
+
+/* Content / tree */
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2px 8px 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.content::-webkit-scrollbar {
+  width: 7px;
+}
+.content::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 4px;
+}
+
+.ws {
+  margin-bottom: 4px;
+}
+.ws-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  transition: background 0.12s ease;
+}
+.ws-head:hover {
+  background: var(--fill);
+}
+.ws-head .ws-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-head .count {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+.ws-remove {
+  opacity: 0;
+  color: var(--muted);
+  font-size: 12px;
+  transition: opacity 0.12s ease;
+}
+.ws-head:hover .ws-remove {
+  opacity: 0.8;
+}
+.ws-remove:hover {
+  opacity: 1;
+  color: var(--text);
+}
+
+.node {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 8px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.08s ease;
+}
+.row:hover {
+  background: var(--fill);
+}
+/* Keyboard selection — like a highlighted native menu item. */
+.row.selected {
+  background: var(--accent);
+}
+.row.selected .label,
+.row.selected .twisty,
+.row.selected .chip,
+.row.selected .meta,
+.row.selected .badge,
+.row.selected .row-act {
+  color: var(--on-accent);
+}
+.row .twisty {
+  width: 11px;
+  color: var(--muted);
+  font-size: 8px;
+  flex-shrink: 0;
+  text-align: center;
+}
+.chip {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+}
+.chip svg {
+  width: 14px;
+  height: 14px;
+}
+.repo-chip {
+  color: var(--text-dim);
+}
+.group-chip {
+  color: var(--muted);
+}
+.row .label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row.repo .label {
+  color: var(--text);
+}
+.row.group .label {
+  color: var(--text-dim);
+}
+.row .badge {
+  display: none;
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  background: var(--fill);
+  border: none;
+  border-radius: 6px;
+  padding: 2.5px 8px;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.row.repo:hover .badge {
+  display: inline-block;
+}
+/* A project with its own remembered IDE shows the badge permanently. */
+.row .badge.badge-own {
+  display: inline-block;
+}
+.row .badge:hover {
+  background: var(--fill-press);
+  color: var(--text);
+}
+
+/* Per-project info (open now / last seen) */
+.meta {
+  flex-shrink: 0;
+  font-size: 11px;
+  white-space: nowrap;
+}
+.open-now {
+  color: var(--green);
+  font-weight: 500;
+}
+.last-seen {
+  color: var(--muted);
+}
+.row.repo:hover .meta {
+  display: none;
+}
+
+.children {
+  margin-left: 13px;
+  border-left: 1px solid var(--line-soft);
+  padding-left: 3px;
+}
+.collapsed > .children {
+  display: none;
+}
+
+.empty {
+  text-align: center;
+  color: var(--muted);
+  padding: 44px 22px;
+  line-height: 1.7;
+}
+.empty button {
+  margin-top: 14px;
+}
+
+/* Footer — a transient status toast, hidden when empty */
+.footer {
+  display: none;
+  justify-content: center;
+  align-items: center;
+  padding: 8px 14px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 11px;
+}
+.footer.visible {
+  display: flex;
+}
+.muted {
+  color: var(--muted);
+}
+
+/* Settings panel. The tree is hidden while it's open (body.settings-open) so
+   nothing shines through the translucent panel — only the window glass. */
+body.settings-open .app {
+  visibility: hidden;
+}
+.panel {
+  position: absolute;
+  inset: 0;
+  background: var(--bg-panel);
+  border-radius: 16px;
+  display: flex;
+  flex-direction: column;
+}
+.panel.hidden {
+  display: none;
+}
+.panel-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--line-soft);
+  font-weight: 600;
+}
+.panel-title {
+  font-size: 13px;
+}
+.panel-body {
+  padding: 14px;
+  overflow-y: auto;
+}
+.ghost-btn {
+  background: var(--fill);
+  border: none;
+  color: var(--text);
+  border-radius: var(--radius-sm);
+  padding: 6px 11px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-left: 6px;
+  transition: background 0.12s ease;
+}
+.ghost-btn:hover {
+  background: var(--fill-hover);
+}
+.ghost-btn.recording {
+  color: var(--accent);
+  background: var(--fill-hover);
+}
+
+/* Selects */
+.select-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.select {
+  flex: 1;
+  background: var(--fill);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 7px 10px;
+  font-size: 12.5px;
+  outline: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23909096' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><polyline points='6 9 12 15 18 9'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 28px;
+}
+.select:focus {
+  background-color: var(--fill-hover);
+}
+/* Base-branch chips: click = default (highlighted), ✕ = remove */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.chip-branch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--fill);
+  border-radius: var(--radius-sm);
+  padding: 4px 9px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.chip-branch:hover {
+  background: var(--fill-hover);
+}
+.chip-branch.active {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.chip-branch .chip-x {
+  opacity: 0.55;
+  font-size: 11px;
+}
+.chip-branch .chip-x:hover {
+  opacity: 1;
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+  margin-top: 12px;
+}
+.hint code {
+  background: var(--fill);
+  border-radius: 4px;
+  padding: 1px 5px;
+  font-size: 10.5px;
+}
+/* Settings tab bar — a thin line icon over a short label; active tab fills.
+   Sits between panel-head and panel-body. */
+.tab-bar {
+  display: flex;
+  gap: 4px;
+  padding: 8px 10px 2px;
+}
+.tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 2px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+.tab svg {
+  width: 19px;
+  height: 19px;
+}
+.tab:hover {
+  color: var(--text-dim);
+  background: var(--fill);
+}
+.tab.active {
+  color: var(--text);
+  background: var(--fill);
+}
+
+/* Settings cards — macOS System-Settings idiom: a bold group title above a
+   bordered, translucent container of rows divided by soft lines. */
+.settings-group {
+  margin-bottom: 18px;
+}
+.settings-group:last-child {
+  margin-bottom: 0;
+}
+.group-title {
+  display: block;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  margin: 0 2px 7px;
+}
+.card {
+  background: var(--fill);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.card-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 12px;
+  min-height: 38px;
+  font-size: 12.5px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.card-row:last-child {
+  border-bottom: none;
+}
+label.card-row {
+  cursor: pointer;
+}
+.card-label {
+  color: var(--text);
+}
+.card-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.card-row input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  flex: none;
+  margin: 0;
+}
+.card-row .select {
+  min-width: 0;
+}
+/* A column row stacks a control block (branch chips + add-row) full width. */
+.card-row--column {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+}
+.card-row--column .chips,
+.card-row--column .select-row {
+  margin-bottom: 0;
+}
+
+/* About: centered identity block (logo · name · version). */
+.card--about {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 18px 12px;
+}
+.about-logo {
+  font-size: 26px;
+  line-height: 1;
+}
+.about-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+.about-version {
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+/* Popovers (IDE picker, fast-start) — frosted, like context menus */
+.ide-picker,
+.fast-start {
+  position: absolute;
+  z-index: 50;
+  background: var(--popover);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  padding: 5px;
+  box-shadow: 0 10px 34px rgba(0, 0, 0, 0.4);
+}
+.ide-picker {
+  min-width: 160px;
+}
+.ide-picker .pick {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 9px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.ide-picker .pick:hover {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.ide-picker .pick:hover .dot {
+  color: var(--on-accent);
+}
+.ide-picker .pick .dot {
+  color: var(--accent);
+  font-size: 10px;
+  width: 10px;
+}
+
+/* Hover actions on repo rows (repo link, fast-start) */
+.row .row-act {
+  display: none;
+  flex-shrink: 0;
+  width: 21px;
+  height: 21px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.row .row-act svg {
+  width: 12.5px;
+  height: 12.5px;
+}
+.row.repo:hover .row-act {
+  display: inline-flex;
+}
+.row .row-act:hover {
+  color: var(--text);
+  background: var(--fill-press);
+}
+/* A pinned project's star stays visible (accent), like the IDE badge. */
+.row .row-act.act-pinned {
+  display: inline-flex;
+  color: var(--accent);
+}
+.row.repo:hover .row-act.act-pinned {
+  color: var(--accent);
+}
+
+/* Narrow numeric inputs in settings cards */
+.num {
+  flex: 0 0 46px;
+  width: 46px;
+  text-align: center;
+  background: var(--fill);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 5px 4px;
+  font-size: 12px;
+  outline: none;
+  -moz-appearance: textfield;
+}
+.num:focus {
+  background: var(--fill-hover);
+}
+.num::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+}
+
+/* Fast-start popover */
+.fast-start {
+  padding: 9px;
+  width: 230px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fast-start input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--fill);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 7px 9px;
+  font-size: 12px;
+  outline: none;
+}
+.fast-start input:focus {
+  background: var(--fill-hover);
+}
+.fast-start .fs-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+.fast-start .fs-label {
+  color: var(--muted);
+  font-size: 11px;
+}
+.fast-start .fs-row .select {
+  flex: 1;
+  min-width: 0;
+}
+
+.hidden {
+  display: none !important;
+}
+
+/* ───────────────────────── hh-jobs additions ───────────────────────── */
+
+.tab-panel.hidden { display: none; }
+.hidden { display: none !important; }
+
+/* Status pill with a leading state dot. */
+.dot-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.dot-badge::before {
+  content: "";
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted);
+  flex: none;
+}
+.dot-badge.ok::before { background: var(--green); }
+.dot-badge.bad::before { background: #ff453a; }
+.dot-badge.busy::before { background: var(--accent); }
+.dot-badge.ok { color: var(--text); }
+
+/* Action buttons reuse .ghost-btn with accents. */
+.ghost-btn.accent { background: var(--accent); color: var(--on-accent); }
+.ghost-btn.accent:hover { filter: brightness(1.08); }
+.ghost-btn.accent:disabled { opacity: 0.4; cursor: default; filter: none; }
+.ghost-btn.danger { color: #ff453a; }
+.ghost-btn:disabled { opacity: 0.4; cursor: default; }
+
+/* Numeric fields — same fill idiom as .select. */
+.num {
+  width: 74px;
+  background: var(--fill);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 6px 9px;
+  font-size: 12.5px;
+  outline: none;
+  text-align: right;
+  -moz-appearance: textfield;
+}
+.num::-webkit-outer-spin-button,
+.num::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.num:focus { background: var(--fill-hover); }
+
+.card-row .select { max-width: 190px; }
+
+/* Search-query rows */
+.query-row { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; }
+.query-row:last-child { margin-bottom: 0; }
+.query-input {
+  flex: 1;
+  background: var(--fill);
+  border: none;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 6px 9px;
+  font-size: 12.5px;
+  outline: none;
+}
+.query-input:focus { background: var(--fill-hover); }
+.row-x {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 5px;
+  border-radius: 5px;
+}
+.row-x:hover { color: var(--text); background: var(--fill-hover); }
+
+/* Schedule chips reuse the .chip-branch look */
+.sched-chip { display: inline-flex; align-items: center; gap: 6px; }
+.sched-chip input[type="time"] {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font: inherit;
+  outline: none;
+  width: 56px;
+}
+
+/* Live log tail */
+.log {
+  margin: 10px 0 0;
+  max-height: 150px;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  font: 10.5px/1.5 "SF Mono", Menlo, monospace;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  word-break: break-all;
+  user-select: text;
+}
+
+.conflict { color: #ff9f0a; margin: 0 0 14px; }
+.save-row { margin-bottom: 0; }
+
+.footer { padding: 7px 14px; border-top: 1px solid var(--line-soft); min-height: 0; }
+#status.error { color: #ff453a; }
+
+/* Run progress: a compact counter strip under the stage line. */
+.stats-row { gap: 4px; }
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+}
+.stat b {
+  font-size: 15px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.stat i {
+  font-style: normal;
+  font-size: 10px;
+  color: var(--muted);
+}
+.stat.on b { color: var(--accent); }
+#stage-label.busy { color: var(--accent); }
+#log-row { padding-top: 0; }
+#log-row .log { margin: 0; width: 100%; }
