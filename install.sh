@@ -78,6 +78,25 @@ else
   fi
 fi
 
+# ---------- 2.5. комплектность пакета ----------
+step "Скиллы, команды и агенты"
+
+MISSING=""
+for p in .claude/agents/hh-collector.md .claude/agents/hh-analyzer.md \
+         .claude/agents/hh-letter.md .claude/agents/hh-applier.md \
+         .claude/commands/hh/init.md .claude/commands/hh/login.md .claude/commands/hh/run.md \
+         .claude/skills/hh-parsing/SKILL.md .claude/skills/hh-matching/SKILL.md \
+         .claude/skills/hh-letter/SKILL.md .claude/skills/hh-applying/SKILL.md \
+         .claude/skills/ru-ai-check/SKILL.md; do
+  [[ -f "$p" ]] || MISSING="$MISSING $p"
+done
+
+if [[ -z "$MISSING" ]]; then
+  ok "4 агента, 3 команды, 5 скиллов на месте (включая ru-ai-check)"
+else
+  bad "не хватает:$MISSING"
+fi
+
 # ---------- 3. браузеры playwright ----------
 step "Браузеры Playwright"
 

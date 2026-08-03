@@ -129,8 +129,9 @@ further.
 ### Gate 1 — Text quality and AI-pattern check (ru-ai-check)
 The letter is a concise professional Russian letter. Invoke the `ru-ai-check` skill and score the
 letter body only (without the contacts block and signature) by its scoring rubric
-(`~/.claude/skills/ru-ai-check/references/scoring.md`, composite 0–10 across typography, clarity,
-grammar, structure, reader precision). The gate passes when the composite score is at least
+(`.claude/skills/ru-ai-check/references/scoring.md`, bundled with this repository — composite 0–10
+across typography, clarity, grammar, structure, reader precision). The gate passes when the
+composite score is at least
 `letter_validation.ru_ai_check_min_score` («Хороший» and above) and no High-severity addendum
 (AD-14/AD-15) fired.
 
