@@ -120,9 +120,108 @@ fn stage_from_log(text: &str) -> &'static str {
     ""
 }
 
+/// Turn one raw log line into a human-readable activity line.
+/// `None` = noise the user does not need to see.
+fn humanize_log_line(line: &str) -> Option<String> {
+    let line = line.trim_end();
+    let trimmed = line.trim();
+    if trimmed.is_empty() || trimmed.starts_with('★') || trimmed.starts_with('─') {
+        return None;
+    }
+
+    if let Some(rest) = trimmed.strip_prefix("[done]") {
+        let turns = rest.split("turns:").nth(1).and_then(|s| s.split('|').next());
+        return Some(match turns {
+            Some(t) => format!("Finished — {} steps", t.trim()),
+            None => "Finished".into(),
+        });
+    }
+    if trimmed.starts_with("[init]") {
+        return Some("Session started".into());
+    }
+
+    // Tool calls: `  → Name [key: value]`
+    if let Some(rest) = trimmed.strip_prefix("→ ") {
+        let (name, arg) = match rest.split_once(" [") {
+            Some((n, a)) => (n, a.trim_end_matches(']')),
+            None => (rest, ""),
+        };
+        let value = arg.split_once(": ").map(|(_, v)| v).unwrap_or("");
+
+        return match name {
+            "Agent" | "Task" => Some(match value {
+                v if v.contains("collector") => "▸ Collector — searching vacancies".into(),
+                v if v.contains("analyzer") => "▸ Analyzer — matching against the resume".into(),
+                v if v.contains("letter") => "▸ Writing a cover letter".into(),
+                v if v.contains("applier") => "▸ Applier — submitting a response".into(),
+                v => format!("▸ {v}"),
+            }),
+            "mcp__playwright__browser_navigate" => {
+                if let Some(id) = value.rsplit("/vacancy/").next().filter(|s| *s != value) {
+                    Some(format!("opening vacancy {}", id.split(['?', '&']).next().unwrap_or(id)))
+                } else if value.contains("/search/vacancy") {
+                    let query = value
+                        .split("text=")
+                        .nth(1)
+                        .and_then(|s| s.split('&').next())
+                        .map(|s| s.replace('+', " "))
+                        .unwrap_or_default();
+                    Some(if query.is_empty() {
+                        "opening hh.ru search".into()
+                    } else {
+                        format!("searching: {query}")
+                    })
+                } else {
+                    Some("opening a page".into())
+                }
+            }
+            "mcp__playwright__browser_click" => Some("clicking".into()),
+            "mcp__playwright__browser_type" | "mcp__playwright__browser_fill_form" => {
+                Some("filling the form".into())
+            }
+            "Read" | "Write" | "Edit" => {
+                let file = value.rsplit('/').next().unwrap_or(value);
+                let verb = if name == "Read" { "reading" } else { "writing" };
+                Some(format!("{verb} {file}"))
+            }
+            "Skill" => Some(format!("skill: {value}")),
+            // Bash, ToolSearch and page reads (`browser_evaluate`/`snapshot`)
+            // fire between every navigation and only pad the feed — the
+            // pulsing status dot already says work is happening.
+            _ => None,
+        };
+    }
+
+    // Plain narration from the model — the most informative part of the log.
+    let clean = trimmed.replace("**", "").replace('`', "");
+    if clean.chars().count() > 160 {
+        return None; // long essays belong in the log file, not the panel
+    }
+    Some(clean)
+}
+
+/// The last few activity lines, consecutive duplicates collapsed.
+fn activity_feed(text: &str, limit: usize) -> Vec<String> {
+    let mut out: Vec<(String, usize)> = Vec::new();
+    for line in text.lines() {
+        let Some(msg) = humanize_log_line(line) else { continue };
+        match out.last_mut() {
+            Some((prev, n)) if *prev == msg => *n += 1,
+            _ => out.push((msg, 1)),
+        }
+    }
+    let start = out.len().saturating_sub(limit);
+    out[start..]
+        .iter()
+        .map(|(msg, n)| if *n > 1 { format!("{msg} ×{n}") } else { msg.clone() })
+        .collect()
+}
+
 #[derive(Serialize)]
 pub struct Progress {
     stage: String,
+    /// Human-readable feed of what the pipeline is doing, oldest first.
+    activity: Vec<String>,
     /// Counts are deltas for the run started from this app; otherwise lifetime.
     since_run: bool,
     found: i64,
@@ -149,10 +248,12 @@ fn progress(state: &RunState, pipe: &PipelineStatus) -> Progress {
     if stage.is_empty() {
         stage = if pipe.running || pipe.external { "Starting up" } else { "Idle" }.into();
     }
+    let activity = activity_feed(&log, 14);
 
     match baseline {
         Some(b) => Progress {
             stage,
+            activity,
             since_run: true,
             found: now.total - b.total,
             // everything that left `pending` since the run began
@@ -166,6 +267,7 @@ fn progress(state: &RunState, pipe: &PipelineStatus) -> Progress {
         },
         None => Progress {
             stage,
+            activity,
             since_run: false,
             found: now.total,
             analyzed: now.matched + now.skipped + now.applied + now.failed,
@@ -1000,6 +1102,63 @@ defaults:
         assert_eq!(stage_from_log(log), "Analyzing vacancies");
         assert_eq!(stage_from_log("[init] ok\n"), "Starting up");
         assert_eq!(stage_from_log("nothing useful\n"), "");
+    }
+
+    #[test]
+    fn activity_feed_reads_like_a_human_wrote_it() {
+        // Lines copied from a real run log.
+        let log = r#"[init] headless-сессия запущена
+  → Read [file_path: /Users/x/job-dispacher/config.yaml]
+  → Bash [command: grep -c "^- id:" data/vacancies-registry.yaml]
+  → ToolSearch
+Запускаю сбор по первому запросу («Laravel»), лимит 20.
+  → Agent [subagent_type: hh-collector]
+  → mcp__playwright__browser_navigate [url: https://hh.ru/search/vacancy?text=Laravel&salary=2000]
+  → mcp__playwright__browser_evaluate
+  → mcp__playwright__browser_evaluate
+  → mcp__playwright__browser_navigate [url: https://hh.ru/vacancy/135826974]
+Собрано 2 новых.
+"#;
+        let feed = activity_feed(log, 20);
+        assert_eq!(
+            feed,
+            vec![
+                "Session started",
+                "reading config.yaml",                  // абсолютный путь срезан
+                "Запускаю сбор по первому запросу («Laravel»), лимит 20.",
+                "▸ Collector — searching vacancies",
+                "searching: Laravel",                   // запрос вытащен из URL
+                "opening vacancy 135826974",            // browser_evaluate отброшен как шум
+                "Собрано 2 новых.",
+            ]
+        );
+        // Bash и ToolSearch — шум, их в ленте быть не должно
+        assert!(!feed.iter().any(|l| l.contains("grep") || l.contains("ToolSearch")));
+    }
+
+    /// Прогоняет ленту по настоящему логу последнего запуска: она должна быть
+    /// читаемой и без абсолютных путей. Пропускается, если лога ещё нет.
+    #[test]
+    fn real_log_feed_is_readable() {
+        let log = std::fs::read_to_string(manual_log_path()).unwrap_or_default();
+        if log.trim().is_empty() {
+            return;
+        }
+        let feed = activity_feed(&log, 14);
+        assert!(!feed.is_empty(), "лог есть, а лента пустая");
+        for line in &feed {
+            println!("| {line}");
+            assert!(!line.contains("/Users/"), "абсолютный путь в ленте: {line}");
+            assert!(line.chars().count() <= 170, "слишком длинная строка: {line}");
+        }
+    }
+
+    #[test]
+    fn activity_feed_keeps_only_the_tail() {
+        let log = (1..=30).map(|i| format!("строка {i}\n")).collect::<String>();
+        let feed = activity_feed(&log, 5);
+        assert_eq!(feed.len(), 5);
+        assert_eq!(feed.last().unwrap(), "строка 30");
     }
 
     #[test]

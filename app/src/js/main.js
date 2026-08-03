@@ -231,13 +231,32 @@ $("stop-run").addEventListener("click", async () => {
 
 $("open-log").addEventListener("click", () => invoke("open_log").catch(fail));
 
-// The raw stream stays one click away; the counters are the default view.
-let logOpen = false;
-$("toggle-log").addEventListener("click", () => {
-  logOpen = !logOpen;
-  $("log-row").classList.toggle("hidden", !logOpen);
-  $("toggle-log").textContent = logOpen ? "Hide" : "Details";
-});
+/// The activity feed is rebuilt only when it actually changed, so the panel
+/// does not flicker and keeps the user's scroll position between polls.
+let lastActivity = "";
+function renderActivity(lines) {
+  const row = $("activity-row");
+  if (!lines.length) {
+    row.classList.add("hidden");
+    return;
+  }
+  row.classList.remove("hidden");
+
+  const signature = lines.join("\n");
+  if (signature === lastActivity) return;
+  lastActivity = signature;
+
+  const box = $("activity");
+  const stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 10;
+  box.innerHTML = "";
+  for (const line of lines) {
+    const el = document.createElement("div");
+    el.className = "ev" + (line.startsWith("▸") ? " stage" : "");
+    el.textContent = line;
+    box.appendChild(el);
+  }
+  if (stick) box.scrollTop = box.scrollHeight;
+}
 
 $("check-auth").addEventListener("click", async () => {
   try {
@@ -327,14 +346,7 @@ async function refresh(first = false) {
   }
   $("st-failed-wrap").classList.toggle("hidden", p.failed === 0);
 
-  // live log tail — only fetched while the details pane is open
-  if (logOpen && (s.pipeline.running || s.pipeline.last_exit != null)) {
-    const text = await invoke("tail_log", { lines: 80 });
-    const pre = $("log-tail");
-    const stick = pre.scrollTop + pre.clientHeight >= pre.scrollHeight - 8;
-    pre.textContent = text || "no output yet";
-    if (stick) pre.scrollTop = pre.scrollHeight;
-  }
+  renderActivity(p.activity);
 
   // config.yaml is the single source of truth: pull in outside edits, but never
   // while a save is queued or the user has a control focused.

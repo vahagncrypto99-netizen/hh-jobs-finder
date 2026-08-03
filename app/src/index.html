@@ -77,9 +77,6 @@
             <div class="card">
               <div class="card-row">
                 <span class="card-label" id="stage-label">Idle</span>
-                <span class="card-control">
-                  <button id="toggle-log" class="ghost-btn">Details</button>
-                </span>
               </div>
               <div class="card-row stats-row">
                 <span class="stat"><b id="st-found">0</b><i>found</i></span>
@@ -88,8 +85,8 @@
                 <span class="stat"><b id="st-applied">0</b><i>applied</i></span>
                 <span class="stat hidden" id="st-failed-wrap"><b id="st-failed">0</b><i>failed</i></span>
               </div>
-              <div class="card-row card-row--column hidden" id="log-row">
-                <pre id="log-tail" class="log"></pre>
+              <div class="card-row card-row--column hidden" id="activity-row">
+                <div id="activity" class="activity"></div>
               </div>
             </div>
           </div>
