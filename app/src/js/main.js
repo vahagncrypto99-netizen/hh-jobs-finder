@@ -223,7 +223,8 @@ $("run-now").addEventListener("click", async () => {
 $("stop-run").addEventListener("click", async () => {
   try {
     await invoke("stop_run");
-    say("Stopped");
+    say("Run stopped");
+    wasRunning = false; // stopping is not a finish — no "run finished" line
     refresh();
   } catch (e) {
     fail(e);
@@ -320,8 +321,11 @@ async function refresh(first = false) {
   else if (s.pipeline.last_exit != null)
     paintBadge($("pipeline-status"), `failed (${s.pipeline.last_exit})`, "bad");
   else paintBadge($("pipeline-status"), "idle");
+  // While anything is running — ours or the scheduler's — the third slot is
+  // Stop, because that is the only action that makes sense then. Idle → Log.
   $("run-now").disabled = running;
-  $("stop-run").classList.toggle("hidden", !s.pipeline.running);
+  $("stop-run").classList.toggle("hidden", !running);
+  $("open-log").classList.toggle("hidden", running);
 
   // scheduler
   paintBadge(

@@ -1048,16 +1048,37 @@ fn run_now(dry: bool, state: State<RunState>) -> Result<(), String> {
 #[tauri::command]
 fn stop_run(state: State<RunState>) -> Result<(), String> {
     let mut guard = state.child.lock().unwrap();
+
     if let Some(child) = guard.as_mut() {
         let pid = child.id();
-        // negative pid -> the whole process group
+        // negative pid -> the whole process group we started
         let _ = Command::new("kill").args(["-TERM", &format!("-{pid}")]).status();
         let _ = child.wait();
         *guard = None;
-        Ok(())
     } else {
-        Err("ручной запуск не активен".into())
+        // A run we do not own: started by launchd, from a terminal, or before
+        // this app process existed. Killing the wrapper alone would orphan the
+        // `claude` child and it would keep applying — so end both.
+        drop(guard);
+        let killed = [PIPELINE_BIN, "claude -p /hh:run"]
+            .iter()
+            .map(|pattern| {
+                Command::new("pkill")
+                    .args(["-TERM", "-f", pattern])
+                    .status()
+                    .map(|s| s.success())
+                    .unwrap_or(false)
+            })
+            .any(|hit| hit);
+        if !killed {
+            return Err("активных прогонов не найдено".into());
+        }
     }
+
+    // The user asked for this: do not announce it as a finished run.
+    *state.finish_pending.lock().unwrap() = None;
+    *state.prev_external.lock().unwrap() = false;
+    Ok(())
 }
 
 #[tauri::command]
